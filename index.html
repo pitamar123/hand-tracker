@@ -126,15 +126,14 @@
             let facesCount = 0;
             let smilingCount = 0;
 
-            // Render Multiple Clean Faces (Focus on outlines, lips, and eyes for minimalism)
+            // Render Multiple Faces cleanly (Cyan outlines, gold eyes, pink lips)
             if (latestFaceResults && latestFaceResults.multiFaceLandmarks) {
                 facesCount = latestFaceResults.multiFaceLandmarks.length;
                 for (const landmarks of latestFaceResults.multiFaceLandmarks) {
-                    // Minimalist contour instead of heavy mesh lines
                     drawConnectors(canvasCtx, landmarks, FACEMESH_RIGHT_EYE, {color: '#00ffff', lineWidth: 2});
                     drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_EYE, {color: '#00ffff', lineWidth: 2});
                     drawConnectors(canvasCtx, landmarks, FACEMESH_LIPS, {color: '#ff0055', lineWidth: 2});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_FACE_OVAL, {color: 'rgba(0, 240, 255, 0.4)', lineWidth: 1.5});
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_FACE_OVAL, {color: 'rgba(0, 240, 255, 0.45)', lineWidth: 1.5});
 
                     if (checkSmile(landmarks)) {
                         smilingCount++;
@@ -178,7 +177,7 @@
         const hands = new Hands({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
         });
-        // Set maxNumHands to 4 to support multiple hands at once
+        // Configured to track up to 4 hands at once
         hands.setOptions({ maxNumHands: 4, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         hands.onResults((results) => {
             latestHandsResults = results;
@@ -188,7 +187,7 @@
         const faceMesh = new FaceMesh({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
         });
-        // Set maxNumFaces to 4 to support multiple users simultaneously
+        // Configured to track up to 4 faces at once
         faceMesh.setOptions({ maxNumFaces: 4, refineLandmarks: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         faceMesh.onResults((results) => {
             latestFaceResults = results;
