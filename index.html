@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Hand & Face Expression Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piece Sign Brave Launcher</title>
     <script>
         window.savedRequire = window.require;
         window.process = undefined;
@@ -13,19 +14,18 @@
     <style>
         body { margin: 0; background: #111; color: #fff; font-family: sans-serif; text-align: center; overflow: hidden; }
         video { display: none; }
-        canvas { width: 100%; height: auto; transform: scaleX(-1); display: block; }
-        .status { font-size: 13px; padding: 8px; background: #222; font-weight: bold; }
+        canvas { width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); display: block; }
+        .status { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); z-index: 10; font-size: 16px; padding: 10px 20px; background: rgba(0,0,0,0.8); border-radius: 8px; }
     </style>
-    <!-- MediaPipe Hand & Face Scripts -->
+    <!-- MediaPipe Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 </head>
 <body>
-    <div class="status" id="status-text">Initializing Trackers...</div>
-    <video id="webcam"></video>
-    <canvas id="output_canvas" width="320" height="240"></canvas>
+    <div class="status" id="status-text">Show a Piece Sign (2 Fingers)</div>
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="output_canvas"></canvas>
 
     <script>
         const ipcRenderer = window.savedRequire ? window.savedRequire('electron').ipcRenderer : null;
@@ -36,10 +36,7 @@
         const statusText = document.getElementById('status-text');
 
         let braveCooldown = false;
-        let latestHands = null;
-        let latestFace = null;
 
-        // Piece sign checker for hands
         function isPieceSign(landmarks) {
             const indexUp = landmarks[8].y < landmarks[6].y;
             const middleUp = landmarks[12].y < landmarks[10].y;
@@ -48,54 +45,21 @@
             return indexUp && middleUp && ringDown && pinkyDown;
         }
 
-        // Expression checker using Face Mesh landmarks
-        function detectExpression(landmarks) {
-            // Mouth width calculation (left corner 61 to right corner 291)
-            const mouthLeft = landmarks[61];
-            const mouthRight = landmarks[291];
-            const mouthWidth = Math.hypot(mouthLeft.x - mouthRight.x, mouthLeft.y - mouthRight.y);
+        function onResults(results) {
+            canvasElement.width = window.innerWidth;
+            canvasElement.height = window.innerHeight;
 
-            // Outer face width reference (left cheek 234 to right cheek 454)
-            const faceLeft = landmarks[234];
-            const faceRight = landmarks[454];
-            const faceWidth = Math.hypot(faceLeft.x - faceRight.x, faceLeft.y - faceRight.y);
-
-            // Smile ratio
-            const smileRatio = mouthWidth / faceWidth;
-            
-            // Threshold for smile (adjust if needed)
-            if (smileRatio > 0.38) {
-                return "Expression: Smiling 😊";
-            }
-            return "Expression: Neutral 😐";
-        }
-
-        function drawEverything() {
             canvasCtx.save();
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-            
-            if (latestFace && latestFace.image) {
-                canvasCtx.drawImage(latestFace.image, 0, 0, canvasElement.width, canvasElement.height);
-            }
-
-            let expressionText = "Expression: Neutral 😐";
-
-            // Draw Face Mesh & check expression
-            if (latestFace && latestFace.multiFaceLandmarks) {
-                for (const landmarks of latestFace.multiFaceLandmarks) {
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, {color: '#C0C0C022', lineWidth: 0.5});
-                    expressionText = detectExpression(landmarks);
-                }
-            }
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
             let pieceDetected = false;
 
-            // Draw Hands & check for piece sign
-            if (latestHands && latestHands.multiHandLandmarks) {
-                for (let i = 0; i < latestHands.multiHandLandmarks.length; i++) {
-                    const landmarks = latestHands.multiHandLandmarks[i];
-                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
-                    drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 1, radius: 2});
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+                    const landmarks = results.multiHandLandmarks[i];
+                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 4});
+                    drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 2, radius: 4});
 
                     if (isPieceSign(landmarks)) {
                         pieceDetected = true;
@@ -103,51 +67,49 @@
                 }
             }
 
-            // Status message handling
             if (pieceDetected) {
-                statusText.innerText = `Piece Sign Detected! Opening Brave... | ${expressionText}`;
-                if (!braveCooldown && ipcRenderer) {
-                    ipcRenderer.send('open-external-app', 'brave');
+                statusText.innerText = "Piece Sign Detected! Opening Brave...";
+                if (!braveCooldown) {
+                    if (ipcRenderer) {
+                        ipcRenderer.send('open-external-app', 'brave');
+                    } else {
+                        console.log("Piece sign triggered action!");
+                    }
                     braveCooldown = true;
                     setTimeout(() => { braveCooldown = false; }, 5000);
                 }
             } else {
-                statusText.innerText = `Show Piece Sign to open Brave | ${expressionText}`;
+                statusText.innerText = "Show a Piece Sign (Index + Middle Up)";
             }
 
             canvasCtx.restore();
         }
 
-        // Initialize Hands Tracker
         const hands = new Hands({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
         });
-        hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-        hands.onResults((results) => {
-            latestHands = results;
-            drawEverything();
+
+        hands.setOptions({
+            maxNumHands: 2,
+            modelComplexity: 0,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
         });
 
-        // Initialize Face Mesh Tracker
-        const faceMesh = new FaceMesh({
-            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-        });
-        faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-        faceMesh.onResults((results) => {
-            latestFace = results;
-            drawEverything();
-        });
+        hands.onResults(onResults);
 
-        // Single Camera feed driving both models
         const camera = new Camera(videoElement, {
             onFrame: async () => {
                 await hands.send({ image: videoElement });
-                await faceMesh.send({ image: videoElement });
             },
-            width: 320,
-            height: 240
+            width: 640,
+            height: 480
         });
-        camera.start();
+        camera.start().then(() => {
+            statusText.innerText = "Tracking Active (Show Piece Sign)";
+        }).catch(err => {
+            statusText.innerText = "Camera Error: " + err.message;
+        });
     </script>
 </body>
 </html>
