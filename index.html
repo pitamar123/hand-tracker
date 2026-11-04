@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hand & Face Tracker</title>
+    <title>High-Visibility Face & Hand Tracker</title>
     <script>
         window.savedRequire = window.require;
         window.process = undefined;
@@ -15,7 +15,7 @@
         body { margin: 0; background: #111; color: #fff; font-family: sans-serif; text-align: center; overflow: hidden; }
         video { display: none; }
         canvas { width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); display: block; }
-        .status { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); z-index: 10; font-size: 15px; padding: 10px 20px; background: rgba(0,0,0,0.8); border-radius: 8px; font-weight: bold; }
+        .status { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); z-index: 10; font-size: 16px; padding: 10px 20px; background: rgba(0,0,0,0.85); border: 2px solid #00FF00; border-radius: 8px; font-weight: bold; }
     </style>
     <!-- MediaPipe Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -24,7 +24,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 </head>
 <body>
-    <div class="status" id="status-text">Loading Trackers...</div>
+    <div class="status" id="status-text">Loading Face Mesh & Hands...</div>
     <video id="webcam" autoplay playsinline></video>
     <canvas id="output_canvas"></canvas>
 
@@ -73,10 +73,17 @@
 
             let faceStatus = "Face: Neutral 😐";
 
-            // Process Face Results
+            // Process & Draw High-Visibility Face Mesh
             if (latestFaceResults && latestFaceResults.multiFaceLandmarks) {
                 for (const landmarks of latestFaceResults.multiFaceLandmarks) {
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, {color: '#C0C0C011', lineWidth: 0.5});
+                    // Bright neon cyan face grid structure
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, {color: 'rgba(0, 240, 255, 0.35)', lineWidth: 1});
+                    
+                    // Highlight facial contours (eyes, lips, brows) in bright orange/yellow
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_RIGHT_EYE, {color: '#FFD700', lineWidth: 2});
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_EYE, {color: '#FFD700', lineWidth: 2});
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_LIPS, {color: '#FF3366', lineWidth: 2});
+
                     if (checkSmile(landmarks)) {
                         faceStatus = "Face: Smiling 😊";
                     }
@@ -85,12 +92,12 @@
 
             let pieceDetected = false;
 
-            // Process Hand Results
+            // Process & Draw Hand Skeletons
             if (latestHandsResults && latestHandsResults.multiHandLandmarks) {
                 for (let i = 0; i < latestHandsResults.multiHandLandmarks.length; i++) {
                     const landmarks = latestHandsResults.multiHandLandmarks[i];
                     drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 3});
-                    drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 1, radius: 3});
+                    drawLandmarks(canvasCtx, landmarks, {color: '#FF0055', lineWidth: 1, radius: 4});
 
                     if (isPieceSign(landmarks)) {
                         pieceDetected = true;
@@ -126,7 +133,7 @@
         const faceMesh = new FaceMesh({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
         });
-        faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         faceMesh.onResults((results) => {
             latestFaceResults = results;
         });
@@ -140,7 +147,7 @@
             height: 480
         });
         camera.start().then(() => {
-            statusText.innerText = "Tracking Ready (Hands & Face)";
+            statusText.innerText = "Tracking Active (High-Vis Face & Hands)";
         });
     </script>
 </body>
