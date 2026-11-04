@@ -113,17 +113,17 @@
 
             let facesCount = 0;
 
-            // Render Multiple Faces: Clean facial contours, glowing eyes, and balanced upper face mesh lines (no mouth lines)
+            // Render Multiple Faces: Richer cyan face mesh grid, glowing eyes, oval outline, NO mouth lines
             if (latestFaceResults && latestFaceResults.multiFaceLandmarks) {
                 facesCount = latestFaceResults.multiFaceLandmarks.length;
                 for (const landmarks of latestFaceResults.multiFaceLandmarks) {
-                    // Balanced semi-transparent cyan mesh lines on the upper face
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, {color: 'rgba(0, 240, 255, 0.2)', lineWidth: 0.8});
+                    // Increased tessellation line density for that holographic look
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, {color: 'rgba(0, 240, 255, 0.35)', lineWidth: 1.0});
                     
                     // Eyes and face oval highlights
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_RIGHT_EYE, {color: '#00ffff', lineWidth: 2});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_EYE, {color: '#00ffff', lineWidth: 2});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_FACE_OVAL, {color: 'rgba(0, 240, 255, 0.6)', lineWidth: 2});
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_RIGHT_EYE, {color: '#00ffff', lineWidth: 2.2});
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_EYE, {color: '#00ffff', lineWidth: 2.2});
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_FACE_OVAL, {color: 'rgba(0, 240, 255, 0.75)', lineWidth: 2.0});
                 }
             }
 
