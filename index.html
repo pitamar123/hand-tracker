@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iron Man HUD Tracker</title>
+    <title>Multi-User Iron Man HUD</title>
     <script>
         window.savedRequire = window.require;
         window.process = undefined;
@@ -37,7 +37,7 @@
             z-index: 10;
             background: rgba(0, 15, 35, 0.85);
             border: 2px solid #00f0ff;
-            box-shadow: 0 0 20px rgba(0, 240, 255, 0.6), inset 0 0 15px rgba(0, 240, 255, 0.4);
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
             color: #00f0ff;
             padding: 12px 24px;
             border-radius: 6px;
@@ -75,7 +75,7 @@
     <div class="hud-corner bottom-left"></div>
     <div class="hud-corner bottom-right"></div>
 
-    <div class="hud-panel" id="status-text">INITIALIZING STARK HUD...</div>
+    <div class="hud-panel" id="status-text">INITIALIZING MULTI-USER HUD...</div>
     
     <video id="webcam" autoplay playsinline></video>
     <canvas id="output_canvas"></canvas>
@@ -123,33 +123,35 @@
                 canvasCtx.drawImage(latestHandsResults.image, 0, 0, canvasElement.width, canvasElement.height);
             }
 
-            let faceStatus = "STATUS: NEUTRAL 😐";
+            let facesCount = 0;
+            let smilingCount = 0;
 
-            // Render Iron Man Blue Glowing Face Mesh
+            // Render Multiple Clean Faces (Focus on outlines, lips, and eyes for minimalism)
             if (latestFaceResults && latestFaceResults.multiFaceLandmarks) {
+                facesCount = latestFaceResults.multiFaceLandmarks.length;
                 for (const landmarks of latestFaceResults.multiFaceLandmarks) {
-                    // Bright neon cyan glowing matrix grid
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, {color: 'rgba(0, 240, 255, 0.45)', lineWidth: 1.2});
-                    
-                    // High-contrast HUD highlights for eyes and lips
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_RIGHT_EYE, {color: '#00ffff', lineWidth: 2.5});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_EYE, {color: '#00ffff', lineWidth: 2.5});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_LIPS, {color: '#ff0055', lineWidth: 2.5});
+                    // Minimalist contour instead of heavy mesh lines
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_RIGHT_EYE, {color: '#00ffff', lineWidth: 2});
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_EYE, {color: '#00ffff', lineWidth: 2});
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_LIPS, {color: '#ff0055', lineWidth: 2});
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_FACE_OVAL, {color: 'rgba(0, 240, 255, 0.4)', lineWidth: 1.5});
 
                     if (checkSmile(landmarks)) {
-                        faceStatus = "STATUS: SMILING 😊";
+                        smilingCount++;
                     }
                 }
             }
 
             let pieceDetected = false;
+            let handsCount = 0;
 
-            // Render Hand Skeletons with Glowing Sci-Fi Aesthetics
+            // Render Multiple Hands Skeletons
             if (latestHandsResults && latestHandsResults.multiHandLandmarks) {
-                for (let i = 0; i < latestHandsResults.multiHandLandmarks.length; i++) {
+                handsCount = latestHandsResults.multiHandLandmarks.length;
+                for (let i = 0; i < handsCount; i++) {
                     const landmarks = latestHandsResults.multiHandLandmarks[i];
-                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00ff66', lineWidth: 3.5});
-                    drawLandmarks(canvasCtx, landmarks, {color: '#00f0ff', lineWidth: 1, radius: 5});
+                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00ff66', lineWidth: 3});
+                    drawLandmarks(canvasCtx, landmarks, {color: '#00f0ff', lineWidth: 1, radius: 4});
 
                     if (isPieceSign(landmarks)) {
                         pieceDetected = true;
@@ -158,7 +160,7 @@
             }
 
             if (pieceDetected) {
-                statusText.innerText = `[!] PIECE SIGN LOCKED -> OPENING BRAVE | ${faceStatus}`;
+                statusText.innerText = `[!] PIECE SIGN LOCKED -> OPENING BRAVE | Faces: ${facesCount} | Hands: ${handsCount}`;
                 if (!braveCooldown) {
                     if (ipcRenderer) {
                         ipcRenderer.send('open-external-app', 'brave');
@@ -167,7 +169,7 @@
                     setTimeout(() => { braveCooldown = false; }, 5000);
                 }
             } else {
-                statusText.innerText = `HUD ACTIVE: SHOW PIECE SIGN | ${faceStatus}`;
+                statusText.innerText = `HUD ONLINE | Faces: ${facesCount} (Smiling: ${smilingCount}) | Hands: ${handsCount}`;
             }
 
             canvasCtx.restore();
@@ -176,7 +178,8 @@
         const hands = new Hands({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
         });
-        hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        // Set maxNumHands to 4 to support multiple hands at once
+        hands.setOptions({ maxNumHands: 4, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         hands.onResults((results) => {
             latestHandsResults = results;
             renderFrame();
@@ -185,7 +188,8 @@
         const faceMesh = new FaceMesh({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
         });
-        faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        // Set maxNumFaces to 4 to support multiple users simultaneously
+        faceMesh.setOptions({ maxNumFaces: 4, refineLandmarks: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         faceMesh.onResults((results) => {
             latestFaceResults = results;
         });
@@ -199,7 +203,7 @@
             height: 480
         });
         camera.start().then(() => {
-            statusText.innerText = "HUD ONLINE - SYSTEMS NOMINAL";
+            statusText.innerText = "MULTI-USER HUD ONLINE";
         });
     </script>
 </body>
