@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>High-Visibility Face & Hand Tracker</title>
+    <title>Iron Man HUD Tracker</title>
     <script>
         window.savedRequire = window.require;
         window.process = undefined;
@@ -12,10 +12,56 @@
         window.require = undefined;
     </script>
     <style>
-        body { margin: 0; background: #111; color: #fff; font-family: sans-serif; text-align: center; overflow: hidden; }
+        body { 
+            margin: 0; 
+            background: #020813; 
+            color: #00f0ff; 
+            font-family: 'Courier New', Courier, monospace; 
+            text-align: center; 
+            overflow: hidden; 
+        }
         video { display: none; }
-        canvas { width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); display: block; }
-        .status { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); z-index: 10; font-size: 16px; padding: 10px 20px; background: rgba(0,0,0,0.85); border: 2px solid #00FF00; border-radius: 8px; font-weight: bold; }
+        canvas { 
+            width: 100vw; 
+            height: 100vh; 
+            object-fit: cover; 
+            transform: scaleX(-1); 
+            display: block; 
+            filter: drop-shadow(0 0 10px #00f0ff);
+        }
+        .hud-panel {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background: rgba(0, 15, 35, 0.85);
+            border: 2px solid #00f0ff;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.6), inset 0 0 15px rgba(0, 240, 255, 0.4);
+            color: #00f0ff;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-shadow: 0 0 8px #00f0ff;
+            pointer-events: none;
+            text-transform: uppercase;
+        }
+        .hud-corner {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-color: #00f0ff;
+            border-style: solid;
+            z-index: 5;
+            pointer-events: none;
+            box-shadow: 0 0 10px #00f0ff;
+        }
+        .top-left { top: 20px; left: 20px; border-width: 3px 0 0 3px; }
+        .top-right { top: 20px; right: 20px; border-width: 3px 3px 0 0; }
+        .bottom-left { bottom: 20px; left: 20px; border-width: 0 0 3px 3px; }
+        .bottom-right { bottom: 20px; right: 20px; border-width: 0 3px 3px 0; }
     </style>
     <!-- MediaPipe Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -24,7 +70,13 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 </head>
 <body>
-    <div class="status" id="status-text">Loading Face Mesh & Hands...</div>
+    <div class="hud-corner top-left"></div>
+    <div class="hud-corner top-right"></div>
+    <div class="hud-corner bottom-left"></div>
+    <div class="hud-corner bottom-right"></div>
+
+    <div class="hud-panel" id="status-text">INITIALIZING STARK HUD...</div>
+    
     <video id="webcam" autoplay playsinline></video>
     <canvas id="output_canvas"></canvas>
 
@@ -71,33 +123,33 @@
                 canvasCtx.drawImage(latestHandsResults.image, 0, 0, canvasElement.width, canvasElement.height);
             }
 
-            let faceStatus = "Face: Neutral 😐";
+            let faceStatus = "STATUS: NEUTRAL 😐";
 
-            // Process & Draw High-Visibility Face Mesh
+            // Render Iron Man Blue Glowing Face Mesh
             if (latestFaceResults && latestFaceResults.multiFaceLandmarks) {
                 for (const landmarks of latestFaceResults.multiFaceLandmarks) {
-                    // Bright neon cyan face grid structure
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, {color: 'rgba(0, 240, 255, 0.35)', lineWidth: 1});
+                    // Bright neon cyan glowing matrix grid
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, {color: 'rgba(0, 240, 255, 0.45)', lineWidth: 1.2});
                     
-                    // Highlight facial contours (eyes, lips, brows) in bright orange/yellow
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_RIGHT_EYE, {color: '#FFD700', lineWidth: 2});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_EYE, {color: '#FFD700', lineWidth: 2});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_LIPS, {color: '#FF3366', lineWidth: 2});
+                    // High-contrast HUD highlights for eyes and lips
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_RIGHT_EYE, {color: '#00ffff', lineWidth: 2.5});
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_EYE, {color: '#00ffff', lineWidth: 2.5});
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_LIPS, {color: '#ff0055', lineWidth: 2.5});
 
                     if (checkSmile(landmarks)) {
-                        faceStatus = "Face: Smiling 😊";
+                        faceStatus = "STATUS: SMILING 😊";
                     }
                 }
             }
 
             let pieceDetected = false;
 
-            // Process & Draw Hand Skeletons
+            // Render Hand Skeletons with Glowing Sci-Fi Aesthetics
             if (latestHandsResults && latestHandsResults.multiHandLandmarks) {
                 for (let i = 0; i < latestHandsResults.multiHandLandmarks.length; i++) {
                     const landmarks = latestHandsResults.multiHandLandmarks[i];
-                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 3});
-                    drawLandmarks(canvasCtx, landmarks, {color: '#FF0055', lineWidth: 1, radius: 4});
+                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00ff66', lineWidth: 3.5});
+                    drawLandmarks(canvasCtx, landmarks, {color: '#00f0ff', lineWidth: 1, radius: 5});
 
                     if (isPieceSign(landmarks)) {
                         pieceDetected = true;
@@ -106,7 +158,7 @@
             }
 
             if (pieceDetected) {
-                statusText.innerText = `Piece Sign Detected! Opening Brave... | ${faceStatus}`;
+                statusText.innerText = `[!] PIECE SIGN LOCKED -> OPENING BRAVE | ${faceStatus}`;
                 if (!braveCooldown) {
                     if (ipcRenderer) {
                         ipcRenderer.send('open-external-app', 'brave');
@@ -115,7 +167,7 @@
                     setTimeout(() => { braveCooldown = false; }, 5000);
                 }
             } else {
-                statusText.innerText = `Show Piece Sign | ${faceStatus}`;
+                statusText.innerText = `HUD ACTIVE: SHOW PIECE SIGN | ${faceStatus}`;
             }
 
             canvasCtx.restore();
@@ -147,7 +199,7 @@
             height: 480
         });
         camera.start().then(() => {
-            statusText.innerText = "Tracking Active (High-Vis Face & Hands)";
+            statusText.innerText = "HUD ONLINE - SYSTEMS NOMINAL";
         });
     </script>
 </body>
