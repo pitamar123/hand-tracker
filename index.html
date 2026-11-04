@@ -100,18 +100,6 @@
             return indexUp && middleUp && ringDown && pinkyDown;
         }
 
-        function checkSmile(landmarks) {
-            const mouthLeft = landmarks[61];
-            const mouthRight = landmarks[291];
-            const mouthWidth = Math.hypot(mouthLeft.x - mouthRight.x, mouthLeft.y - mouthRight.y);
-            
-            const faceLeft = landmarks[234];
-            const faceRight = landmarks[454];
-            const faceWidth = Math.hypot(faceLeft.x - faceRight.x, faceLeft.y - faceRight.y);
-
-            return (mouthWidth / faceWidth) > 0.38;
-        }
-
         function renderFrame() {
             canvasElement.width = window.innerWidth;
             canvasElement.height = window.innerHeight;
@@ -124,20 +112,18 @@
             }
 
             let facesCount = 0;
-            let smilingCount = 0;
 
-            // Render Multiple Faces cleanly (Cyan outlines, gold eyes, pink lips)
+            // Render Multiple Faces: Clean facial contours, glowing eyes, and balanced upper face mesh lines (no mouth lines)
             if (latestFaceResults && latestFaceResults.multiFaceLandmarks) {
                 facesCount = latestFaceResults.multiFaceLandmarks.length;
                 for (const landmarks of latestFaceResults.multiFaceLandmarks) {
+                    // Balanced semi-transparent cyan mesh lines on the upper face
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, {color: 'rgba(0, 240, 255, 0.2)', lineWidth: 0.8});
+                    
+                    // Eyes and face oval highlights
                     drawConnectors(canvasCtx, landmarks, FACEMESH_RIGHT_EYE, {color: '#00ffff', lineWidth: 2});
                     drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_EYE, {color: '#00ffff', lineWidth: 2});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_LIPS, {color: '#ff0055', lineWidth: 2});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_FACE_OVAL, {color: 'rgba(0, 240, 255, 0.45)', lineWidth: 1.5});
-
-                    if (checkSmile(landmarks)) {
-                        smilingCount++;
-                    }
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_FACE_OVAL, {color: 'rgba(0, 240, 255, 0.6)', lineWidth: 2});
                 }
             }
 
@@ -168,7 +154,7 @@
                     setTimeout(() => { braveCooldown = false; }, 5000);
                 }
             } else {
-                statusText.innerText = `HUD ONLINE | Faces: ${facesCount} (Smiling: ${smilingCount}) | Hands: ${handsCount}`;
+                statusText.innerText = `HUD ONLINE | Faces: ${facesCount} | Hands: ${handsCount}`;
             }
 
             canvasCtx.restore();
@@ -177,7 +163,6 @@
         const hands = new Hands({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
         });
-        // Configured to track up to 4 hands at once
         hands.setOptions({ maxNumHands: 4, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         hands.onResults((results) => {
             latestHandsResults = results;
@@ -187,7 +172,6 @@
         const faceMesh = new FaceMesh({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
         });
-        // Configured to track up to 4 faces at once
         faceMesh.setOptions({ maxNumFaces: 4, refineLandmarks: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         faceMesh.onResults((results) => {
             latestFaceResults = results;
