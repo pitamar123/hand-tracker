@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-User Iron Man HUD with Pinch Drag</title>
+    <title>Iron Man HUD - Tuned Gestures</title>
     <script>
         window.savedRequire = window.require;
         window.process = undefined;
@@ -28,6 +28,8 @@
             transform: scaleX(-1); 
             display: block; 
             filter: drop-shadow(0 0 10px #00f0ff);
+            transform-origin: center center;
+            transition: transform 0.1s ease-out;
         }
         .hud-panel {
             position: absolute;
@@ -45,8 +47,7 @@
             font-weight: bold;
             letter-spacing: 2px;
             text-shadow: 0 0 8px #00f0ff;
-            cursor: grab;
-            user-select: none;
+            pointer-events: none;
             text-transform: uppercase;
         }
         .hud-corner {
@@ -95,9 +96,7 @@
 
         let celebrationParticles = [];
         let celebrationTimer = 0;
-
-        // Pinch dragging state
-        let isDragging = false;
+        let zoomLevel = 1.0;
 
         function isPieceSign(landmarks) {
             const indexUp = landmarks[8].y < landmarks[6].y;
@@ -140,4 +139,133 @@
                 for (const landmarks of latestFaceResults.multiFaceLandmarks) {
                     drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, {color: 'rgba(0, 240, 255, 0.35)', lineWidth: 1.0});
                     drawConnectors(canvasCtx, landmarks, FACEMESH_RIGHT_EYE, {color: '#00ffff', lineWidth: 2.2});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_EYE, {color: '#00ffff', lineWidth: 2.2});
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_FACE_OVAL, {color: 'rgba(0, 240, 255, 0.75)', lineWidth: 2.0});
+                }
+            }
+
+            let pieceDetected = false;
+            let handsCount = 0;
+            let handsLandmarksList = [];
+            let pinchingActive = false;
+
+            // Render Hands & Check Gestures
+            if (latestHandsResults && latestHandsResults.multiHandLandmarks) {
+                handsCount = latestHandsResults.multiHandLandmarks.length;
+                for (let i = 0; i < handsCount; i++) {
+                    const landmarks = latestHandsResults.multiHandLandmarks[i];
+                    handsLandmarksList.push(landmarks);
+                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00ff66', lineWidth: 3});
+                    drawLandmarks(canvasCtx, landmarks, {color: '#00f0ff', lineWidth: 1, radius: 4});
+
+                    if (isPieceSign(landmarks)) {
+                        pieceDetected = true;
+                    }
+
+                    // Strict Pinch detection for Zooming (Thumb tip [4] and Index tip [8])
+                    const thumbTip = landmarks[4];
+                    const indexTip = landmarks[8];
+                    const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+
+                    if (pinchDist < 0.04) {
+                        pinchingActive = true;
+                        // Zoom in when pinching fingers close
+                        zoomLevel = Math.min(2.0, zoomLevel + 0.02);
+                    } else if (pinchDist > 0.15) {
+                        // Zoom out when spreading fingers wide
+                        zoomLevel = Math.max(1.0, zoomLevel - 0.02);
+                    }
+                }
+            }
+
+            // Apply smooth zoom scaling to the canvas view
+            canvasElement.style.transform = `scaleX(-1) scale(${zoomLevel})`;
+
+            // Fixed Clap Detection: Requires strict closeness between palm bases (landmark 0) AND index MCPs (landmark 5) to prevent false triggers
+            let clapDetected = false;
+            if (handsCount >= 2) {
+                const h1_wrist = handsLandmarksList[0][0];
+                const h2_wrist = handsLandmarksList[1][0];
+                const h1_index = handsLandmarksList[0][5];
+                const h2_index = handsLandmarksList[1][5];
+
+                const wristDist = Math.hypot(h1_wrist.x - h2_wrist.x, h1_wrist.y - h2_wrist.y);
+                const indexDist = Math.hypot(h1_index.x - h2_index.x, h1_index.y - h2_index.y);
+
+                if (wristDist < 0.08 && indexDist < 0.10) {
+                    clapDetected = true;
+                }
+            }
+
+            if (clapDetected && celebrationTimer <= 0) {
+                triggerCelebration();
+            }
+
+            // Celebration rendering
+            if (celebrationTimer > 0) {
+                celebrationTimer--;
+                for (let p of celebrationParticles) {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    canvasCtx.fillStyle = p.color;
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    canvasCtx.fill();
+                }
+                statusText.style.borderColor = "#00ff66";
+                statusText.style.boxShadow = "0 0 25px #00ff66";
+                statusText.innerText = `🎉 CELEBRATION UNLOCKED! 🎉`;
+            } else {
+                statusText.style.borderColor = "#00f0ff";
+                statusText.style.boxShadow = "0 0 20px rgba(0, 240, 255, 0.6)";
+
+                if (pieceDetected) {
+                    statusText.innerText = `[!] PIECE SIGN LOCKED -> OPENING BRAVE | Faces: ${facesCount} | Hands: ${handsCount}`;
+                    if (!braveCooldown) {
+                        if (ipcRenderer) {
+                            ipcRenderer.send('open-external-app', 'brave');
+                        }
+                        braveCooldown = true;
+                        setTimeout(() => { braveCooldown = false; }, 5000);
+                    }
+                } else if (pinchingActive) {
+                    statusText.innerText = `[ZOOM LEVEL: ${zoomLevel.toFixed(1)}x]`;
+                } else {
+                    statusText.innerText = `HUD ONLINE | Faces: ${facesCount} | Hands: ${handsCount} (PINCH TO ZOOM)`;
+                }
+            }
+
+            canvasCtx.restore();
+        }
+
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+        hands.setOptions({ maxNumHands: 4, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+        hands.onResults((results) => {
+            latestHandsResults = results;
+            renderFrame();
+        });
+
+        const faceMesh = new FaceMesh({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+        });
+        faceMesh.setOptions({ maxNumFaces: 4, refineLandmarks: false, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+        faceMesh.onResults((results) => {
+            latestFaceResults = results;
+        });
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({ image: videoElement });
+                await faceMesh.send({ image: videoElement });
+            },
+            width: 640,
+            height: 480
+        });
+        camera.start().then(() => {
+            statusText.innerText = "MULTI-USER HUD ONLINE";
+        });
+    </script>
+</body>
+</html>
