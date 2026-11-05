@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-User Iron Man HUD</title>
+    <title>Multi-User Iron Man HUD with Celebration</title>
     <script>
         window.savedRequire = window.require;
         window.process = undefined;
@@ -47,6 +47,7 @@
             text-shadow: 0 0 8px #00f0ff;
             pointer-events: none;
             text-transform: uppercase;
+            transition: all 0.2s ease;
         }
         .hud-corner {
             position: absolute;
@@ -75,7 +76,7 @@
     <div class="hud-corner bottom-left"></div>
     <div class="hud-corner bottom-right"></div>
 
-    <div class="hud-panel" id="status-text">INITIALIZING MULTI-USER HUD...</div>
+    <div class="hud-panel" id="status-text">INITIALIZING HUD...</div>
     
     <video id="webcam" autoplay playsinline></video>
     <canvas id="output_canvas"></canvas>
@@ -92,12 +93,31 @@
         let latestHandsResults = null;
         let latestFaceResults = null;
 
+        // Celebration particles array
+        let celebrationParticles = [];
+        let celebrationTimer = 0;
+
         function isPieceSign(landmarks) {
             const indexUp = landmarks[8].y < landmarks[6].y;
             const middleUp = landmarks[12].y < landmarks[10].y;
             const ringDown = landmarks[16].y > landmarks[14].y;
             const pinkyDown = landmarks[20].y > landmarks[18].y;
             return indexUp && middleUp && ringDown && pinkyDown;
+        }
+
+        // Trigger celebratory particles
+        function triggerCelebration() {
+            celebrationTimer = 90; // Active for 90 frames (~1.5 seconds)
+            for (let i = 0; i < 60; i++) {
+                celebrationParticles.push({
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    vx: (Math.random() - 0.5) * 12,
+                    vy: (Math.random() - 0.5) * 12,
+                    color: ['#00ff66', '#00ffff', '#ff0055', '#ffd700'][Math.floor(Math.random() * 4)],
+                    size: Math.random() * 6 + 3
+                });
+            }
         }
 
         function renderFrame() {
@@ -113,7 +133,7 @@
 
             let facesCount = 0;
 
-            // Render Multiple Faces: Rich face mesh grid, glowing eyes, and oval outline (NO lips)
+            // Render Faces (Rich mesh grid, eyes, oval - NO lips)
             if (latestFaceResults && latestFaceResults.multiFaceLandmarks) {
                 facesCount = latestFaceResults.multiFaceLandmarks.length;
                 for (const landmarks of latestFaceResults.multiFaceLandmarks) {
@@ -126,12 +146,14 @@
 
             let pieceDetected = false;
             let handsCount = 0;
+            let handsLandmarksList = [];
 
-            // Render Multiple Hands Skeletons
+            // Render Hands Skeletons
             if (latestHandsResults && latestHandsResults.multiHandLandmarks) {
                 handsCount = latestHandsResults.multiHandLandmarks.length;
                 for (let i = 0; i < handsCount; i++) {
                     const landmarks = latestHandsResults.multiHandLandmarks[i];
+                    handsLandmarksList.push(landmarks);
                     drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00ff66', lineWidth: 3});
                     drawLandmarks(canvasCtx, landmarks, {color: '#00f0ff', lineWidth: 1, radius: 4});
 
@@ -141,17 +163,49 @@
                 }
             }
 
-            if (pieceDetected) {
-                statusText.innerText = `[!] PIECE SIGN LOCKED -> OPENING BRAVE | Faces: ${facesCount} | Hands: ${handsCount}`;
-                if (!braveCooldown) {
-                    if (ipcRenderer) {
-                        ipcRenderer.send('open-external-app', 'brave');
+            // Check if two hands are clapping (distance between wrist or index fingers is very small)
+            if (handsCount >= 2) {
+                // Compare hand 0 wrist (landmark 0) to hand 1 wrist (landmark 0)
+                const h1 = handsLandmarksList[0][0];
+                const h2 = handsLandmarksList[1][0];
+                const distance = Math.hypot(h1.x - h2.x, h1.y - h2.y);
+
+                if (distance < 0.12) { // Closeness threshold for a clap
+                    if (celebrationTimer <= 0) {
+                        triggerCelebration();
                     }
-                    braveCooldown = true;
-                    setTimeout(() => { braveCooldown = false; }, 5000);
                 }
+            }
+
+            // Render celebration particles if active
+            if (celebrationTimer > 0) {
+                celebrationTimer--;
+                for (let p of celebrationParticles) {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    canvasCtx.fillStyle = p.color;
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    canvasCtx.fill();
+                }
+                statusText.style.borderColor = "#00ff66";
+                statusText.style.boxShadow = "0 0 25px #00ff66";
+                statusText.innerText = `🎉 CELEBRATION UNLOCKED! 🎉`;
             } else {
-                statusText.innerText = `HUD ONLINE | Faces: ${facesCount} | Hands: ${handsCount}`;
+                statusText.style.borderColor = "#00f0ff";
+                statusText.style.boxShadow = "0 0 20px rgba(0, 240, 255, 0.6)";
+                if (pieceDetected) {
+                    statusText.innerText = `[!] PIECE SIGN LOCKED -> OPENING BRAVE | Faces: ${facesCount} | Hands: ${handsCount}`;
+                    if (!braveCooldown) {
+                        if (ipcRenderer) {
+                            ipcRenderer.send('open-external-app', 'brave');
+                        }
+                        braveCooldown = true;
+                        setTimeout(() => { braveCooldown = false; }, 5000);
+                    }
+                } else {
+                    statusText.innerText = `HUD ONLINE | Faces: ${facesCount} | Hands: ${handsCount} (CLAP TO CELEBRATE)`;
+                }
             }
 
             canvasCtx.restore();
